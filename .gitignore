@@ -5,6 +5,7 @@ work/
 # Frontend dependencies and build artifacts
 frontend/node_modules/
 frontend/dist/
+frontend/package-lock.json
 
 # Common environment and log files
 .env
