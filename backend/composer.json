@@ -1,0 +1,13 @@
+{
+  "name": "ccop/backend",
+  "description": "Backend skeleton for the ЦЦОП portal",
+  "type": "project",
+  "require": {
+    "php": "^8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    }
+  }
+}

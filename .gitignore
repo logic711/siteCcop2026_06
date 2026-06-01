@@ -1,0 +1,23 @@
+# Service folders used by the local Codex workspace
+outputs/
+work/
+
+# Frontend dependencies and build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# Common environment and log files
+.env
+.env.*
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Docker and cache artifacts
+*.pid
+*.seed
+*.out

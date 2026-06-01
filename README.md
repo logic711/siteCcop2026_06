@@ -1,0 +1,42 @@
+# Портал ЦЦОП
+
+Проект подготовлен в требуемой структуре:
+
+- `frontend` - Vue 3 + TypeScript + Vite.
+- `backend` - PHP backend в Laravel-ориентированной структуре.
+- `db` - PostgreSQL и начальная схема.
+- `nginx` - конфигурация веб-сервера.
+- `docker-compose.yml` - контейнеризация всего проекта.
+
+## Что реализовано
+
+- шапка и подвал, которые доступны на всех страницах;
+- личный кабинет с ролевой логикой и блоком админ-панели;
+- авторизация, восстановление пароля и регистрация;
+- модальное окно согласия на обработку персональных данных;
+- cookie-уведомление;
+- разделы портала и базовые права модераторов;
+- backend API-заготовки и схема БД под роли, страницы и публикации.
+
+## Локальный запуск
+
+```bash
+docker compose up --build
+```
+
+После старта:
+
+- frontend dev server: `http://localhost:5173`
+- общий вход через nginx: `http://localhost:8080`
+
+## CI/CD
+
+Для проекта добавлен GitHub Actions pipeline в [.github/workflows/ci-cd.yml](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/.github/workflows/ci-cd.yml).
+
+Pipeline делает следующее:
+
+- запускается автоматически на `push` и `pull_request`;
+- выполняет предварительные проверки и сборку;
+- поднимает staging-среду через Docker Compose;
+- выполняет дополнительные smoke/integration тесты;
+- при успешном прохождении деплоит на production по SSH для веток `main` и `master`.

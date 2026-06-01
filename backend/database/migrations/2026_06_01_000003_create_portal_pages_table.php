@@ -1,0 +1,12 @@
+<?php
+
+return <<<'SQL'
+CREATE TABLE portal_pages (
+    id BIGSERIAL PRIMARY KEY,
+    slug VARCHAR(120) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+SQL;

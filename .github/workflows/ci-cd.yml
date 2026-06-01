@@ -1,0 +1,159 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preliminary-tests:
+    name: Preliminary Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Lint PHP sources
+        shell: bash
+        run: |
+          find backend -type f -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Verify bootstrap SQL exists
+        shell: bash
+        run: |
+          test -f db/init.sql
+          grep -q "administrator" db/init.sql
+
+  staging-and-additional-tests:
+    name: Staging And Additional Tests
+    runs-on: ubuntu-latest
+    needs: preliminary-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start staging environment
+        run: docker compose up --build -d
+
+      - name: Wait for frontend
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:5173 >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Frontend did not become ready in time"
+          docker compose logs frontend
+          exit 1
+
+      - name: Wait for backend health endpoint
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Backend did not become ready in time"
+          docker compose logs backend nginx
+          exit 1
+
+      - name: Smoke test homepage through nginx
+        shell: bash
+        run: |
+          curl -fsS http://localhost:8080 | tee homepage.html >/dev/null
+          grep -q "Портал ЦЦОП" homepage.html
+
+      - name: Smoke test backend health response
+        shell: bash
+        run: |
+          curl -fsS http://localhost:8080/api/health | tee health.json
+          grep -q '"status"' health.json
+          grep -q '"ok"' health.json
+
+      - name: Additional test for pages API
+        shell: bash
+        run: |
+          curl -fsS http://localhost:8080/api/pages | tee pages.json
+          grep -q "О портале" pages.json
+          grep -q "Helpdesk РИУ" pages.json
+
+      - name: Additional test for admin authentication API
+        shell: bash
+        run: |
+          curl -fsS -X POST http://localhost:8080/api/login \
+            -H "Content-Type: application/json" \
+            -d '{"login":"admin","password":"admin12345#12345#"}' | tee login.json
+          grep -q '"role"' login.json
+          grep -q '"administrator"' login.json
+
+      - name: Additional test for second admin authentication API
+        shell: bash
+        run: |
+          curl -fsS -X POST http://localhost:8080/api/login \
+            -H "Content-Type: application/json" \
+            -d '{"login":"bulov.a.n@yandex.ru","password":"Sdk7sdk7sdk7#"}' | tee second-admin-login.json
+          grep -q '"role"' second-admin-login.json
+          grep -q '"administrator"' second-admin-login.json
+
+      - name: Stop staging environment
+        if: always()
+        run: docker compose down -v
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: staging-and-additional-tests
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    environment:
+      name: production
+
+    steps:
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT }}
+          script_stop: true
+          script: |
+            set -e
+            cd "${{ secrets.PROD_PATH }}"
+            git fetch origin
+            git checkout "${{ github.ref_name }}"
+            git pull origin "${{ github.ref_name }}"
+            docker compose down
+            docker compose up --build -d

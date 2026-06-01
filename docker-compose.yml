@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ccop-frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    networks:
+      - ccop-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ccop-backend
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ccop
+      DB_USERNAME: ccop
+      DB_PASSWORD: ccop
+    depends_on:
+      - db
+    networks:
+      - ccop-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: ccop-db
+    environment:
+      POSTGRES_DB: ccop
+      POSTGRES_USER: ccop
+      POSTGRES_PASSWORD: ccop
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ccop-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ccop-nginx
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - ccop-network
+
+volumes:
+  postgres-data:
+
+networks:
+  ccop-network:
+    driver: bridge
