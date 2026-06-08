@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -72,6 +74,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -188,6 +192,26 @@ jobs:
       name: production
 
     steps:
+      - name: Validate production deploy secrets
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_PASSWORD: ${{ secrets.PROD_PASSWORD }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_PATH: ${{ secrets.PROD_PATH }}
+        shell: bash
+        run: |
+          missing=0
+          for name in PROD_HOST PROD_USER PROD_PASSWORD PROD_PORT PROD_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing GitHub secret::$name is not configured in Settings -> Secrets and variables -> Actions."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Deploy to production server
         uses: appleboy/ssh-action@v1.0.3
         with:
