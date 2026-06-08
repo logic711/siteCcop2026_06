@@ -2,14 +2,22 @@
 
 В репозитории настроен workflow [ci-cd.yml](./ci-cd.yml) со следующими этапами:
 
-1. `Preliminary Tests`
+1. `Lint`
    - проверка `docker compose config`;
    - установка frontend-зависимостей;
-   - сборка Vite-приложения;
+   - запуск ESLint для Vue/TypeScript frontend;
    - `php -l` для backend PHP-файлов;
    - базовая проверка `db/init.sql`.
 
-2. `Staging And Additional Tests`
+2. `Cross-platform Tests`
+   - параллельный запуск на:
+   - `ubuntu-latest`;
+   - `windows-latest`;
+   - `macos-latest`;
+   - сборка frontend;
+   - проверка синтаксиса backend PHP.
+
+3. `Staging And Additional Tests`
    - подъем тестовой среды через `docker compose up --build -d`;
    - ожидание готовности frontend и backend;
    - smoke-тест главной страницы через `nginx`;
@@ -17,10 +25,14 @@
    - проверка `/api/pages`;
    - проверка авторизации двух администраторов.
 
-3. `Deploy Production`
+4. `Deploy Production`
    - выполняется только после успешных тестов;
    - выполняется только для push в `main` или `master`;
    - идет по SSH на боевой сервер и перезапускает проект через `docker compose`.
+
+5. `Failure Summary`
+   - если pipeline падает, публикует краткую сводку по job-статусам;
+   - причина ошибки берется из конкретного упавшего job и шага.
 
 ## Какие secrets нужно добавить в GitHub
 

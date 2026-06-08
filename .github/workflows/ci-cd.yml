@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preliminary-tests:
-    name: Preliminary Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -35,11 +35,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: npm install --include=optional
 
-      - name: Build frontend
+      - name: Lint frontend
         working-directory: frontend
-        run: npm run build
+        run: npm run lint
 
       - name: Lint PHP sources
         shell: bash
@@ -52,10 +52,54 @@ jobs:
           test -f db/init.sql
           grep -q "administrator" db/init.sql
 
+  cross-platform-tests:
+    name: Cross-platform Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --include=optional
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Check backend PHP syntax
+        shell: bash
+        run: |
+          find backend -type f -name "*.php" -print0 | xargs -0 -n1 php -l
+
   staging-and-additional-tests:
     name: Staging And Additional Tests
     runs-on: ubuntu-latest
-    needs: preliminary-tests
+    needs:
+      - lint
+      - cross-platform-tests
+    env:
+      FRONTEND_URL: http://localhost:5174
+      PORTAL_URL: http://localhost:8081
 
     steps:
       - name: Checkout repository
@@ -68,7 +112,7 @@ jobs:
         shell: bash
         run: |
           for i in {1..30}; do
-            if curl -fsS http://localhost:5173 >/dev/null; then
+            if curl -fsS "$FRONTEND_URL" >/dev/null; then
               exit 0
             fi
             sleep 5
@@ -81,7 +125,7 @@ jobs:
         shell: bash
         run: |
           for i in {1..30}; do
-            if curl -fsS http://localhost:8080/api/health >/dev/null; then
+            if curl -fsS "$PORTAL_URL/api/health" >/dev/null; then
               exit 0
             fi
             sleep 5
@@ -93,27 +137,27 @@ jobs:
       - name: Smoke test homepage through nginx
         shell: bash
         run: |
-          curl -fsS http://localhost:8080 | tee homepage.html >/dev/null
+          curl -fsS "$PORTAL_URL" | tee homepage.html >/dev/null
           grep -q "Портал ЦЦОП" homepage.html
 
       - name: Smoke test backend health response
         shell: bash
         run: |
-          curl -fsS http://localhost:8080/api/health | tee health.json
+          curl -fsS "$PORTAL_URL/api/health" | tee health.json
           grep -q '"status"' health.json
           grep -q '"ok"' health.json
 
       - name: Additional test for pages API
         shell: bash
         run: |
-          curl -fsS http://localhost:8080/api/pages | tee pages.json
+          curl -fsS "$PORTAL_URL/api/pages" | tee pages.json
           grep -q "О портале" pages.json
           grep -q "Helpdesk РИУ" pages.json
 
       - name: Additional test for admin authentication API
         shell: bash
         run: |
-          curl -fsS -X POST http://localhost:8080/api/login \
+          curl -fsS -X POST "$PORTAL_URL/api/login" \
             -H "Content-Type: application/json" \
             -d '{"login":"admin","password":"admin12345#12345#"}' | tee login.json
           grep -q '"role"' login.json
@@ -122,7 +166,7 @@ jobs:
       - name: Additional test for second admin authentication API
         shell: bash
         run: |
-          curl -fsS -X POST http://localhost:8080/api/login \
+          curl -fsS -X POST "$PORTAL_URL/api/login" \
             -H "Content-Type: application/json" \
             -d '{"login":"bulov.a.n@yandex.ru","password":"Sdk7sdk7sdk7#"}' | tee second-admin-login.json
           grep -q '"role"' second-admin-login.json
@@ -135,7 +179,10 @@ jobs:
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
-    needs: staging-and-additional-tests
+    needs:
+      - lint
+      - cross-platform-tests
+      - staging-and-additional-tests
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     environment:
       name: production
@@ -161,3 +208,28 @@ jobs:
             fi
             docker compose -f docker-compose.prod.yml --env-file .env.production down
             docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d
+
+  failure-summary:
+    name: Failure Summary
+    runs-on: ubuntu-latest
+    if: always() && (needs.lint.result == 'failure' || needs.cross-platform-tests.result == 'failure' || needs.staging-and-additional-tests.result == 'failure' || needs.deploy-production.result == 'failure')
+    needs:
+      - lint
+      - cross-platform-tests
+      - staging-and-additional-tests
+      - deploy-production
+
+    steps:
+      - name: Publish failure summary
+        shell: bash
+        run: |
+          {
+            echo "## Pipeline failed"
+            echo ""
+            echo "- Lint: ${{ needs.lint.result }}"
+            echo "- Cross-platform tests: ${{ needs.cross-platform-tests.result }}"
+            echo "- Staging and additional tests: ${{ needs.staging-and-additional-tests.result }}"
+            echo "- Deploy production: ${{ needs.deploy-production.result }}"
+            echo ""
+            echo "Причину ошибки смотрите в job со статусом failure и в конкретном шаге с красным крестиком."
+          } >> "$GITHUB_STEP_SUMMARY"
