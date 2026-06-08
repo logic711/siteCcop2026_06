@@ -1,0 +1,43 @@
+---
+- name: Deploy CCOP portal to Ubuntu VM
+  hosts: ccop
+  become: true
+  vars:
+    app_dir: /opt/ccop-portal
+    repo_url: https://github.com/logic711/siteCcop2026_06.git
+    repo_version: main
+  tasks:
+    - name: Ensure git is installed
+      ansible.builtin.package:
+        name: git
+        state: present
+
+    - name: Ensure application directory exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Checkout portal repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ repo_version }}"
+        force: true
+
+    - name: Copy production environment file
+      ansible.builtin.copy:
+        src: ../../.env.production.example
+        dest: "{{ app_dir }}/.env.production"
+        mode: "0644"
+        force: false
+
+    - name: Build and start production containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        files:
+          - docker-compose.prod.yml
+        env_files:
+          - "{{ app_dir }}/.env.production"
+        build: always
+        state: present

@@ -1,0 +1,2 @@
+[ccop]
+192.168.2.137 ansible_user=user ansible_port=22

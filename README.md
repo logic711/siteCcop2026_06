@@ -40,3 +40,17 @@ Pipeline делает следующее:
 - поднимает staging-среду через Docker Compose;
 - выполняет дополнительные smoke/integration тесты;
 - при успешном прохождении деплоит на production по SSH для веток `main` и `master`.
+
+## Ubuntu VM Deploy
+
+Для переноса проекта на Ubuntu Server 24 подготовлен production-набор:
+
+- [docker-compose.prod.yml](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/docker-compose.prod.yml)
+- [nginx/Dockerfile.prod](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/nginx/Dockerfile.prod)
+- [nginx/prod.conf](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/nginx/prod.conf)
+- [.env.production.example](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/.env.production.example)
+- [deploy/ansible/deploy.yml](/C:/Users/user/Documents/Codex/2026-06-01/files-mentioned-by-the-user-txt/deploy/ansible/deploy.yml)
+
+Целевой адрес портала на виртуальной машине по умолчанию:
+
+- `http://192.168.2.137:8081`

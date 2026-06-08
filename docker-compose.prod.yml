@@ -1,0 +1,54 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ccop-backend-prod
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-ccop}
+      DB_USERNAME: ${POSTGRES_USER:-ccop}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ccop}
+    depends_on:
+      - db
+    networks:
+      - ccop-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: ccop-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ccop}
+      POSTGRES_USER: ${POSTGRES_USER:-ccop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ccop}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ccop-network
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile.prod
+    container_name: ccop-nginx-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${PORTAL_HTTP_PORT:-8081}:80"
+    networks:
+      - ccop-network
+
+volumes:
+  postgres-data:
+
+networks:
+  ccop-network:
+    driver: bridge

@@ -147,6 +147,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          password: ${{ secrets.PROD_PASSWORD }}
           port: ${{ secrets.PROD_PORT }}
           script_stop: true
           script: |
@@ -155,5 +156,8 @@ jobs:
             git fetch origin
             git checkout "${{ github.ref_name }}"
             git pull origin "${{ github.ref_name }}"
-            docker compose down
-            docker compose up --build -d
+            if [ ! -f .env.production ]; then
+              cp .env.production.example .env.production
+            fi
+            docker compose -f docker-compose.prod.yml --env-file .env.production down
+            docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d
