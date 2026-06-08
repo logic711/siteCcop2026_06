@@ -194,6 +194,7 @@ jobs:
         shell: bash
         run: |
           set -e
+          git config --global --add safe.directory /opt/ccop-portal
           cd /opt/ccop-portal
           git fetch origin
           git checkout "${{ github.ref_name }}"
