@@ -182,56 +182,27 @@ jobs:
 
   deploy-production:
     name: Deploy Production
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ccop, ubuntu24, prod]
     needs:
       - lint
       - cross-platform-tests
       - staging-and-additional-tests
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    environment:
-      name: production
 
     steps:
-      - name: Validate production deploy secrets
-        env:
-          PROD_HOST: ${{ secrets.PROD_HOST }}
-          PROD_USER: ${{ secrets.PROD_USER }}
-          PROD_PASSWORD: ${{ secrets.PROD_PASSWORD }}
-          PROD_PORT: ${{ secrets.PROD_PORT }}
-          PROD_PATH: ${{ secrets.PROD_PATH }}
+      - name: Deploy on production VM
         shell: bash
         run: |
-          missing=0
-          for name in PROD_HOST PROD_USER PROD_PASSWORD PROD_PORT PROD_PATH; do
-            if [ -z "${!name}" ]; then
-              echo "::error title=Missing GitHub secret::$name is not configured in Settings -> Secrets and variables -> Actions."
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
+          set -e
+          cd /opt/ccop-portal
+          git fetch origin
+          git checkout "${{ github.ref_name }}"
+          git pull origin "${{ github.ref_name }}"
+          if [ ! -f .env.production ]; then
+            cp .env.production.example .env.production
           fi
-
-      - name: Deploy to production server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          password: ${{ secrets.PROD_PASSWORD }}
-          port: ${{ secrets.PROD_PORT }}
-          script_stop: true
-          script: |
-            set -e
-            cd "${{ secrets.PROD_PATH }}"
-            git fetch origin
-            git checkout "${{ github.ref_name }}"
-            git pull origin "${{ github.ref_name }}"
-            if [ ! -f .env.production ]; then
-              cp .env.production.example .env.production
-            fi
-            docker compose -f docker-compose.prod.yml --env-file .env.production down
-            docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d
+          docker compose -f docker-compose.prod.yml --env-file .env.production down
+          docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d
 
   failure-summary:
     name: Failure Summary
