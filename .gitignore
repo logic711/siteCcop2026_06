@@ -10,6 +10,7 @@ frontend/package-lock.json
 # Common environment and log files
 .env
 .env.*
+!.env.production.example
 *.log
 
 # OS/editor noise
