@@ -26,8 +26,8 @@ docker compose up --build
 
 После старта:
 
-- frontend dev server: `http://localhost:5173`
-- общий вход через nginx: `http://localhost:8080`
+- frontend dev server: `http://localhost:5174`
+- общий вход через nginx: `http://localhost:8081`
 
 ## CI/CD
 
@@ -36,10 +36,11 @@ docker compose up --build
 Pipeline делает следующее:
 
 - запускается автоматически на `push` и `pull_request`;
-- выполняет предварительные проверки и сборку;
+- выполняет lint-проверку;
+- параллельно проверяет сборку на `ubuntu-latest`, `windows-latest` и `macos-latest`;
 - поднимает staging-среду через Docker Compose;
 - выполняет дополнительные smoke/integration тесты;
-- при успешном прохождении деплоит на production по SSH для веток `main` и `master`.
+- при успешном прохождении деплоит на production через self-hosted runner для веток `main` и `master`.
 
 ## Ubuntu VM Deploy
 
